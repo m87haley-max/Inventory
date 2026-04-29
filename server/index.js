@@ -2,21 +2,20 @@ import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
 import cors from 'cors';
-import { compareSync } from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 import { db } from './db.js';
-import { requireAuth } from './auth.js';
+import authRouter, { requireAuth } from './auth.js';
 import ingredientsRouter from './routes/ingredients.js';
-import suppliersRouter  from './routes/suppliers.js';
-import recipesRouter    from './routes/recipes.js';
-import shrinkRouter     from './routes/shrink.js';
-import squareRouter     from './routes/square.js';
+import suppliersRouter   from './routes/suppliers.js';
+import recipesRouter     from './routes/recipes.js';
+import shrinkRouter      from './routes/shrink.js';
+import squareRouter      from './routes/square.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const app   = express();
-const PORT  = process.env.PORT || 3001;
+const app    = express();
+const PORT   = process.env.PORT || 3001;
 const isProd = process.env.NODE_ENV === 'production';
 
 app.use(express.json());
@@ -34,35 +33,17 @@ app.use(session({
 
 // Request logger
 app.use((req, res, next) => {
-  const t = Date.now();
-  res.on('finish', () => console.log(`${req.method} ${req.path} ${res.statusCode} ${Date.now() - t}ms`));
+  const start = Date.now();
+  res.on('finish', () =>
+    console.log(`${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`)
+  );
   next();
 });
 
-// ── Auth (unprotected) ──────────────────────────────────────────────────────
-app.post('/api/login', (req, res) => {
-  const { password } = req.body;
-  const stored = process.env.APP_PASSWORD || '';
-  const valid = stored.startsWith('$2')
-    ? compareSync(password, stored)
-    : password === stored;
-  if (valid) {
-    req.session.authenticated = true;
-    return res.json({ data: { authenticated: true } });
-  }
-  res.status(401).json({ error: 'Invalid password' });
-});
+// ── Auth routes (login / logout / me — no requireAuth) ──────────────────────
+app.use('/api', authRouter);
 
-app.post('/api/logout', (req, res) => {
-  req.session.destroy();
-  res.json({ data: { authenticated: false } });
-});
-
-app.get('/api/me', (req, res) => {
-  res.json({ authenticated: !!req.session?.authenticated });
-});
-
-// ── Protected routes ────────────────────────────────────────────────────────
+// ── Protected API routes ─────────────────────────────────────────────────────
 app.use('/api/ingredients', requireAuth, ingredientsRouter);
 app.use('/api/suppliers',   requireAuth, suppliersRouter);
 app.use('/api/recipes',     requireAuth, recipesRouter);
@@ -79,15 +60,15 @@ app.delete('/api/reset', requireAuth, (req, res) => {
   res.json({ data: { cleared: true } });
 });
 
-// ── Serve frontend in production ────────────────────────────────────────────
+// ── Serve frontend in production ─────────────────────────────────────────────
 if (isProd) {
   const dist = join(__dirname, '../client/dist');
   app.use(express.static(dist));
   app.get('*', (req, res) => res.sendFile(join(dist, 'index.html')));
 }
 
-// ── Global error handler ────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
+// ── Global error handler ─────────────────────────────────────────────────────
+app.use((err, req, res, _next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Internal server error' });
 });

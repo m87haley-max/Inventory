@@ -1,4 +1,5 @@
-import { Client, Environment } from 'square';
+import squarePkg from 'square';
+const { Client, Environment } = squarePkg;
 
 export function getSquareClient() {
   return new Client({
