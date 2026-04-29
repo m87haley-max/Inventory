@@ -22,8 +22,8 @@ export default function Login({ onLogin }) {
         body: JSON.stringify({ password }),
       });
       const data = await res.json();
-      if (res.ok) return onLogin();
-      setError(data.error || 'Invalid password');
+      if (res.ok) return window.location.reload();
+      setError('Incorrect password');
     } catch {
       setError('Connection error — is the server running?');
     } finally {

@@ -14,14 +14,7 @@ function Root() {
   }, []);
 
   if (auth === null) {
-    return (
-      <div style={{ background: '#07090f', minHeight: '100vh', display: 'flex',
-        alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#7a8ea8', fontFamily: "'Jost', sans-serif", fontSize: 14 }}>
-          Loading…
-        </div>
-      </div>
-    );
+    return <div style={{ background: '#07090f', minHeight: '100vh' }} />;
   }
 
   if (!auth) return <Login onLogin={() => setAuth(true)} />;
