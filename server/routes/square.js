@@ -6,20 +6,31 @@ import { squareClient } from '../square-client.js';
 const router = Router();
 const LOCATION_ID = 'LNYH65XS386CD';
 
-router.post('/sync', async (req, res, next) => {
+// Prepared statements hoisted so they are compiled once, not per-request
+const insertSale = db.prepare(`
+  INSERT INTO sales_log (id, item_name, variation_id, qty, revenue, date_range_start, date_range_end)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+const getRecipeLines  = db.prepare('SELECT * FROM recipe_lines WHERE menu_item_id = ?');
+const getIngStock     = db.prepare('SELECT stock FROM ingredients WHERE id = ?');
+const updateIngStock  = db.prepare('UPDATE ingredients SET stock = ? WHERE id = ?');
+
+router.post('/sync', async (req, res) => {
   const { start_date, end_date, deduct_stock = false } = req.body;
   if (!start_date || !end_date) {
     return res.status(400).json({ error: 'start_date and end_date required' });
   }
 
+  // ── 1. Fetch all completed orders from Square (paginated) ─────────────────
+  let orders = [];
   try {
-    const startAt = new Date(start_date + 'T00:00:00Z').toISOString();
-    const endAt   = new Date(end_date   + 'T23:59:59Z').toISOString();
-
-    // 1. Paginate through all completed orders for the location
-    const orders = [];
+    const startAt = new Date(start_date).toISOString();
+    const endAt   = new Date(end_date + 'T23:59:59Z').toISOString();
     let cursor;
     do {
+      // v42 SDK: squareClient.orders.search() is the equivalent of
+      // v37's squareClient.ordersApi.searchOrders(). Response is returned
+      // directly (no .result wrapper). Keys are camelCase.
       const response = await squareClient.orders.search({
         locationIds: [LOCATION_ID],
         query: {
@@ -27,6 +38,7 @@ router.post('/sync', async (req, res, next) => {
             stateFilter: { states: ['COMPLETED'] },
             dateTimeFilter: { closedAt: { startAt, endAt } },
           },
+          sort: { sortField: 'CLOSED_AT' },
         },
         ...(cursor ? { cursor } : {}),
         limit: 500,
@@ -34,63 +46,58 @@ router.post('/sync', async (req, res, next) => {
       if (response.orders) orders.push(...response.orders);
       cursor = response.cursor;
     } while (cursor);
+  } catch (err) {
+    console.error('Square API error:', err);
+    return res.status(502).json({
+      error: err?.errors?.[0]?.detail ?? err.message ?? 'Square API request failed',
+    });
+  }
 
-    // 2. Aggregate qty + revenue by catalog_object_id (variation ID)
-    const salesMap = {};
-    for (const order of orders) {
-      for (const item of (order.lineItems || [])) {
-        const vid = item.catalogObjectId;
-        if (!vid) continue;
-        if (!salesMap[vid]) salesMap[vid] = { qty: 0, revenue: 0 };
-        salesMap[vid].qty += parseInt(item.quantity || '1', 10);
-        salesMap[vid].revenue += Number(item.totalMoney?.amount ?? 0) / 100;
-      }
+  // ── 2. Aggregate qty + revenue by catalog_object_id (= variation ID) ──────
+  const salesMap = {};
+  for (const order of orders) {
+    for (const item of (order.lineItems || [])) {
+      const vid = item.catalogObjectId;
+      if (!vid) continue;
+      if (!salesMap[vid]) salesMap[vid] = { qty: 0, revenue: 0 };
+      salesMap[vid].qty     += parseInt(item.quantity || '1', 10);
+      salesMap[vid].revenue += Number(item.totalMoney?.amount ?? 0) / 100;
     }
+  }
 
-    // 3. Match variation IDs to menu_items
-    const menuItems = db.prepare('SELECT * FROM menu_items').all();
-    const matched = [];
-    for (const [varId, agg] of Object.entries(salesMap)) {
-      const mi = menuItems.find(m => m.variation_id === varId);
-      if (mi) matched.push({ varId, mi, qty: agg.qty, revenue: agg.revenue });
-    }
+  // ── 3. Match variation IDs to menu_items ──────────────────────────────────
+  const menuItems = db.prepare('SELECT * FROM menu_items').all();
+  const matched = [];
+  for (const [varId, agg] of Object.entries(salesMap)) {
+    const mi = menuItems.find(m => m.variation_id === varId);
+    if (mi) matched.push({ varId, mi, qty: agg.qty, revenue: agg.revenue });
+  }
 
-    // 4 & 5. Deduct stock + save to sales_log — all in one transaction
-    db.transaction(() => {
-      for (const s of matched) {
-        db.prepare(`
-          INSERT INTO sales_log (id, item_name, variation_id, qty, revenue, date_range_start, date_range_end)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(randomUUID(), s.mi.name, s.varId, s.qty, s.revenue, start_date, end_date);
+  // ── 4–6. Deduct stock + persist sales — single SQLite transaction ─────────
+  db.transaction(() => {
+    for (const s of matched) {
+      // 6. Save to sales_log
+      insertSale.run(randomUUID(), s.mi.name, s.varId, s.qty, s.revenue, start_date, end_date);
 
-        if (deduct_stock) {
-          const lines = db.prepare(
-            'SELECT * FROM recipe_lines WHERE menu_item_id = ?'
-          ).all(s.mi.id);
-          for (const line of lines) {
-            const ing = db.prepare(
-              'SELECT stock FROM ingredients WHERE id = ?'
-            ).get(line.ingredient_id);
-            if (!ing) continue;
-            const deduct = (line.stock_qty ?? line.qty) * s.qty;
-            db.prepare('UPDATE ingredients SET stock = ? WHERE id = ?')
-              .run(Math.max(0, ing.stock - deduct), line.ingredient_id);
-          }
+      // 5. Deduct ingredient stock if requested
+      if (deduct_stock) {
+        for (const line of getRecipeLines.all(s.mi.id)) {
+          const ing = getIngStock.get(line.ingredient_id);
+          if (!ing) continue;
+          const deduct = (line.stock_qty ?? line.qty) * s.qty;
+          updateIngStock.run(Math.max(0, ing.stock - deduct), line.ingredient_id);
         }
       }
-    })();
+    }
+  })();
 
-    // 6. Return results
-    res.json({
-      data: {
-        sales: matched.map(s => ({ itemName: s.mi.name, qty: s.qty, revenue: s.revenue })),
-        orders_processed: orders.length,
-      },
-    });
-  } catch (err) {
-    console.error('Square sync error:', err);
-    next(err);
-  }
+  // ── 7. Return aggregated results ──────────────────────────────────────────
+  res.json({
+    data: {
+      sales: matched.map(s => ({ itemName: s.mi.name, qty: s.qty, revenue: s.revenue })),
+      orders_processed: orders.length,
+    },
+  });
 });
 
 router.get('/sync/latest', (req, res) => {
