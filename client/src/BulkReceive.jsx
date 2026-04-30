@@ -194,7 +194,7 @@ function BulkReceive({ ingredients, setIngredients, suppliers }) {
 /* ══════════════════════════════════════════════════════════════════════════════
    SALES SYNC TAB
 ══════════════════════════════════════════════════════════════════════════════ */
-const QUICK_RANGES = [
+export const QUICK_RANGES = [
   { label:"Today",       days:0  },
   { label:"Yesterday",   days:1  },
   { label:"Last 3 days", days:3  },

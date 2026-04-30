@@ -1,5 +1,3 @@
-import { useState, useEffect, useRef } from "react";
-
 /* ─── Google Fonts ─────────────────────────────────────────────────────────── */
 const FontLoader = () => (
   <style>{`
@@ -106,5 +104,6 @@ const SEED_MENU = [
   { id:"3ZVIIJL6MZEOSBIHAAR6GEPM",  name:"Grilled Chicken Taco",       squareId:"CWVS5RDWBUJXTRFKS4XK7VDD", variationId:"3ZVIIJL6MZEOSBIHAAR6GEPM",  price:7.00,   recipe:[] },
   { id:"KM25DMMVZYGN5MUXBFQPHMDB",  name:"Steak Sliders",              squareId:"3SYTQICWT6PENF2PNYX7GLHV", variationId:"KM25DMMVZYGN5MUXBFQPHMDB",  price:14.00,  recipe:[] },
   { id:"TDLMC7BKJGR6FJICD6ACBQY7",  name:"Aguachile",                  squareId:"CNELYMJUBGIACYQZUQSNHZAP", variationId:"TDLMC7BKJGR6FJICD6ACBQY7",  price:16.00,  recipe:[] },
+];
 
 export default FontLoader;

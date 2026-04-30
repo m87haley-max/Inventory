@@ -102,7 +102,7 @@ function Suppliers({ suppliers, setSuppliers, ingredients }) {
 
 // Common unit conversions — recipeUnit → stockUnit → multiplier
 // e.g. if stock is in "lbs" and recipe uses "oz", multiplier = 1/16
-const UNIT_CONVERSIONS = {
+export const UNIT_CONVERSIONS = {
   // Weight
   "oz→lbs":   1/16,    "lbs→oz":   16,
   "oz→kg":    1/35.274,"kg→oz":    35.274,

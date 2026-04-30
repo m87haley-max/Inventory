@@ -1,6 +1,3 @@
-];
-
-
 /* ─── Helpers ───────────────────────────────────────────────────────────────── */
 const status = (stock, par) => {
   if (!par) return "ok";
@@ -136,7 +133,7 @@ const Modal = ({ open, onClose, title, children }) => {
 };
 
 /* ─── Header ─────────────────────────────────────────────────────────────────── */
-const Header = ({ onSync, syncing, lastSync, cloudDot }) => (
+const Header = ({ onSync, syncing, lastSync, onLogout }) => (
   <div style={{ background:"var(--ocean)", borderBottom:"1px solid var(--border)",
     padding:"0 28px", display:"flex", alignItems:"center", height:60, gap:16, flexShrink:0,
     position:"sticky", top:0, zIndex:100, backdropFilter:"blur(8px)" }}>
@@ -180,6 +177,12 @@ const Header = ({ onSync, syncing, lastSync, cloudDot }) => (
         fontFamily:"'Jost',sans-serif", fontSize:12, fontWeight:600,
         letterSpacing:"0.05em", cursor:"pointer", display:"flex", alignItems:"center", gap:7 }}>
         {syncing ? "⟳ Syncing…" : "⬇ Pull Square Sales"}
+      </button>
+      <button className="btn-hover" onClick={onLogout} style={{
+        background:"none", border:"1px solid var(--borderLt)", borderRadius:5,
+        padding:"7px 14px", color:"var(--textMuted)", fontFamily:"'Jost',sans-serif",
+        fontSize:11, fontWeight:600, letterSpacing:"0.05em", cursor:"pointer" }}>
+        Log out
       </button>
     </div>
   </div>
@@ -237,3 +240,13 @@ const SETUP_STEPS = [
   { tab:"inventory", icon:"◻", label:"Add your ingredients", sub:"Everything you stock and reorder — oysters, proteins, sauces, garnishes." },
   { tab:"recipes",   icon:"◆", label:"Map recipes to menu items", sub:"Link each Square item to the ingredients it uses so sales auto-deduct stock." },
 ];
+
+export {
+  status, STATUS_COLOR, STATUS_BG, STATUS_LABEL,
+  fc, fmtn,
+  Badge, Bar, Flame, Shell,
+  Card, SectionTitle, Th, Td,
+  Btn, Input, Select, Label, FG,
+  Modal, Header, Nav, Stat,
+  SETUP_STEPS,
+};

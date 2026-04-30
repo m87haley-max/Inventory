@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fc, fmtn, Card, SectionTitle, Th, Td, Btn, Input, Select, Label, FG, Modal } from "./ui.jsx";
+import { UNIT_CONVERSIONS } from "./Suppliers.jsx";
 
 function getConversion(recipeUnit, stockUnit) {
   if (!recipeUnit || !stockUnit) return 1;

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { fc, fmtn, Card, SectionTitle, Stat, Th, Td, Btn } from "./ui.jsx";
+import { fc, fmtn, Card, SectionTitle, Stat, Th, Td, Btn, Input } from "./ui.jsx";
+import { QUICK_RANGES } from "./BulkReceive.jsx";
 
 function Sales({ salesLog, menuItems, ingredients, onSync, syncing, syncRange, setSyncRange }) {
   const [customStart, setCustomStart] = useState("");
@@ -186,7 +187,7 @@ function Sales({ salesLog, menuItems, ingredients, onSync, syncing, syncRange, s
 /* ══════════════════════════════════════════════════════════════════════════════
    SQUARE SYNC FUNCTION
 ══════════════════════════════════════════════════════════════════════════════ */
-async function squareSync(ingredients, menuItems, setIngredients, setSyncing, setLastSync, setSalesLog, dateRange, deductStock) {
+export async function squareSync(ingredients, menuItems, setIngredients, setSyncing, setLastSync, setSalesLog, dateRange, deductStock) {
   setSyncing(true);
   try {
     const rangeDesc = dateRange
@@ -243,29 +244,5 @@ No markdown. No explanation. Pure JSON only.`,
   } catch(e) { console.error(e); }
   setSyncing(false);
 }
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   CLOUD STORAGE — shared across all devices via window.storage (shared=true)
-   Note: data is shared with anyone who has access to this artifact.
-══════════════════════════════════════════════════════════════════════════════ */
-const STORE_KEY = "bonfire:v1";
-
-async function loadFromCloud() {
-  try {
-    const result = await window.storage.get(STORE_KEY, true);
-    if (result?.value) return JSON.parse(result.value);
-  } catch(_) {}
-  return null;
-}
-
-async function saveToCloud(state) {
-  try {
-    await window.storage.set(STORE_KEY, JSON.stringify(state), true);
-  } catch(e) { console.error("Save failed:", e); }
-}
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   ROOT
-══════════════════════════════════════════════════════════════════════════════ */
 
 export default Sales;

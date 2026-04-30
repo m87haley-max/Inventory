@@ -8,7 +8,7 @@ import Recipes     from "./Recipes.jsx";
 import Shrink      from "./Shrink.jsx";
 import Orders      from "./Orders.jsx";
 import Suppliers   from "./Suppliers.jsx";
-import Sales       from "./Sales.jsx";
+import Sales, { squareSync } from "./Sales.jsx";
 
 const SEED_INGREDIENTS = [];
 const SEED_MENU        = [];
