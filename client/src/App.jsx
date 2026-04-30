@@ -1,5 +1,22 @@
+import { useState, useEffect, useRef } from "react";
+import FontLoader from "./theme.jsx";
+import { Flame, Header, Nav } from "./ui.jsx";
+import Dashboard   from "./Dashboard.jsx";
+import Inventory   from "./Inventory.jsx";
+import BulkReceive from "./BulkReceive.jsx";
+import Recipes     from "./Recipes.jsx";
+import Shrink      from "./Shrink.jsx";
+import Orders      from "./Orders.jsx";
+import Suppliers   from "./Suppliers.jsx";
+import Sales       from "./Sales.jsx";
+
+const SEED_INGREDIENTS = [];
+const SEED_MENU        = [];
+const SEED_SHRINK      = [];
+const SUPPLIERS        = [];
+
 export default function App() {
-  const [tab, setTab]             = useState("dashboard");
+  const [tab, setTab]               = useState("dashboard");
   const [ingredients, setIngredients] = useState(SEED_INGREDIENTS);
   const [menuItems,   setMenuItems]   = useState(SEED_MENU);
   const [shrinkLog,   setShrinkLog]   = useState(SEED_SHRINK);
@@ -8,77 +25,41 @@ export default function App() {
   const [syncing,     setSyncing]     = useState(false);
   const [lastSync,    setLastSync]    = useState(null);
   const [syncRange,   setSyncRange]   = useState(7);
-  const [cloudStatus, setCloudStatus] = useState("loading");
-  const [confirmReset, setConfirmReset] = useState(false);
-  const saveTimer = useRef(null);
+  const [loading,     setLoading]     = useState(true);
 
-  /* ── Load from cloud on mount ── */
+  /* ── Load all data on mount ── */
   useEffect(() => {
-    loadFromCloud().then(saved => {
-      if (saved) {
-        // Only restore if the saved data actually has content
-        if (saved.ingredients?.length > 0) setIngredients(saved.ingredients);
-        if (saved.menuItems?.length   > 0) setMenuItems(saved.menuItems);
-        if (saved.shrinkLog?.length   > 0) setShrinkLog(saved.shrinkLog);
-        if (saved.suppliers?.length   > 0) setSuppliers(saved.suppliers);
-        if (saved.salesLog?.length    > 0) setSalesLog(saved.salesLog);
-        if (saved.lastSync)                setLastSync(saved.lastSync);
-      }
-      setCloudStatus("synced");
-    }).catch(() => setCloudStatus("error"));
+    Promise.all([
+      fetch("/api/ingredients").then(r => r.json()),
+      fetch("/api/suppliers").then(r => r.json()),
+      fetch("/api/recipes").then(r => r.json()),
+      fetch("/api/shrink").then(r => r.json()),
+    ]).then(([ings, sups, recipes, shrink]) => {
+      setIngredients(ings);
+      setSuppliers(sups);
+      setMenuItems(recipes);
+      setShrinkLog(shrink);
+    }).finally(() => setLoading(false));
   }, []);
-
-  /* ── Auto-save whenever data changes (debounced 1.5s) ── */
-  useEffect(() => {
-    if (cloudStatus === "loading") return;
-    clearTimeout(saveTimer.current);
-    setCloudStatus("saving");
-    saveTimer.current = setTimeout(() => {
-      saveToCloud({ ingredients, menuItems, shrinkLog, suppliers, salesLog, lastSync })
-        .then(() => setCloudStatus("synced"))
-        .catch(() => setCloudStatus("error"));
-    }, 1500);
-    return () => clearTimeout(saveTimer.current);
-  }, [ingredients, menuItems, shrinkLog, suppliers, salesLog, lastSync]);
-
-  /* ── Hard reset — wipes cloud and resets all state to empty ── */
-  const resetAllData = async () => {
-    setIngredients([]);
-    setMenuItems(SEED_MENU); // keep Square menu items, just clear ingredients/suppliers/shrink
-    setShrinkLog([]);
-    setSuppliers([]);
-    setSalesLog([]);
-    setLastSync(null);
-    try { await window.storage.delete(STORE_KEY, true); } catch(_) {}
-    setConfirmReset(false);
-    setCloudStatus("synced");
-    setTab("dashboard");
-  };
 
   const handleSync = (dateRange, deductStock) =>
     squareSync(ingredients, menuItems, setIngredients, setSyncing, setLastSync, setSalesLog, dateRange, deductStock);
 
-  const cloudDot = {
-    loading: { color:"var(--textMuted)", label:"Loading…"   },
-    saving:  { color:"var(--yellow)",    label:"Saving…"    },
-    synced:  { color:"var(--teal)",      label:"Saved"      },
-    error:   { color:"var(--red)",       label:"Save error" },
-  }[cloudStatus];
+  const logout = () =>
+    fetch("/api/logout", { method: "POST" }).finally(() => window.location.reload());
 
   return (
     <div style={{ fontFamily:"'Jost',sans-serif", background:"var(--bg)", color:"var(--text)", minHeight:"100vh", display:"flex", flexDirection:"column" }}>
       <FontLoader />
-      <Header onSync={()=>setTab("sales")} syncing={syncing} lastSync={lastSync} cloudDot={cloudDot} />
+      <Header onSync={()=>setTab("sales")} syncing={syncing} lastSync={lastSync} onLogout={logout} />
       <Nav active={tab} setActive={setTab} />
 
-      {cloudStatus === "loading" && (
+      {loading ? (
         <div style={{ textAlign:"center", padding:"60px 0", color:"var(--textMuted)",
           fontFamily:"'DM Mono',monospace", fontSize:13 }}>
-          ⟳ Loading your inventory from the cloud…
+          ⟳ Loading inventory…
         </div>
-      )}
-
-      {cloudStatus !== "loading" && (
+      ) : (
         <div style={{ flex:1, padding:"24px 28px", maxWidth:1300, width:"100%", margin:"0 auto" }}>
           {tab==="dashboard" && <Dashboard ingredients={ingredients} shrinkLog={shrinkLog} menuItems={menuItems} suppliers={suppliers} onTabChange={setTab} />}
           {tab==="inventory"  && <Inventory  ingredients={ingredients} setIngredients={setIngredients} suppliers={suppliers} />}
@@ -94,50 +75,10 @@ export default function App() {
       )}
 
       <div style={{ borderTop:"1px solid var(--border)", padding:"12px 28px",
-        display:"flex", alignItems:"center", justifyContent:"space-between", background:"var(--ocean)" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <Flame size={14} />
-          <span style={{ fontFamily:"'Playfair Display',serif", fontSize:12, color:"var(--textMuted)", fontStyle:"italic" }}>
-            Bonfire Oyster Co. · 970-234-0500 · Events@bonfireoysterco.com
-          </span>
-        </div>
-        <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-          {/* Cloud status */}
-          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <div style={{ width:6, height:6, borderRadius:"50%", background:cloudDot.color }} />
-            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:"var(--textMuted)" }}>
-              {cloudDot.label}
-            </span>
-          </div>
-          {/* Reset button — two step */}
-          {confirmReset ? (
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <span style={{ fontFamily:"'Jost',sans-serif", fontSize:11, color:"var(--red)" }}>
-                Wipe all data?
-              </span>
-              <button onClick={resetAllData} style={{
-                padding:"4px 12px", borderRadius:4, fontSize:11, fontWeight:700,
-                cursor:"pointer", border:"1px solid var(--red)",
-                background:"var(--red)", color:"#fff", fontFamily:"'Jost',sans-serif" }}>
-                Yes, Reset
-              </button>
-              <button onClick={()=>setConfirmReset(false)} style={{
-                padding:"4px 10px", borderRadius:4, fontSize:11,
-                cursor:"pointer", border:"1px solid var(--border)",
-                background:"var(--surfaceHi)", color:"var(--textMuted)", fontFamily:"'Jost',sans-serif" }}>
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button onClick={()=>setConfirmReset(true)} style={{
-              padding:"4px 10px", borderRadius:4, fontSize:10,
-              cursor:"pointer", border:"1px solid var(--border)",
-              background:"none", color:"var(--textFaint)", fontFamily:"'DM Mono',monospace",
-              letterSpacing:"0.05em" }}>
-              reset data
-            </button>
-          )}
-        </div>
+        display:"flex", alignItems:"center", justifyContent:"center", background:"var(--ocean)" }}>
+        <span style={{ fontFamily:"'Playfair Display',serif", fontSize:12, color:"var(--textMuted)", fontStyle:"italic" }}>
+          © Bonfire Oyster Co.
+        </span>
       </div>
     </div>
   );
