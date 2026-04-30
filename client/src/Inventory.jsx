@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { status, fc, fmtn, STATUS_COLOR, Badge, Card, SectionTitle, Th, Td, Btn, Input, Select, Label, FG, Modal } from "./ui.jsx";
 
-function Inventory({ ingredients, setIngredients, suppliers }) {
+function Inventory({ ingredients, suppliers, onSave, onDelete, onAdjust }) {
   const CATS = ["Shellfish","Fish","Produce","Dairy","Sauces","Bread","Pantry","Luxury","Other"];
   const blank = {
     name:"", category:"Shellfish", supplierId:"",
@@ -36,7 +36,7 @@ function Inventory({ ingredients, setIngredients, suppliers }) {
     setEditId(i.id);
     setModal(true);
   };
-  const save = () => {
+  const save = async () => {
     const caseQty    = +form.caseQty  || 1;
     const caseCost   = +form.caseCost || 0;
     const costPerUnit = caseQty > 0 ? caseCost / caseQty : 0;
@@ -52,21 +52,16 @@ function Inventory({ ingredients, setIngredients, suppliers }) {
       par:          +form.par    || 0,
       stock:        +form.stock  || 0,
       shrinkPct:    +form.shrinkPct || 5,
-      unit:         form.trackingUnit, // keep legacy field
-      cost:         costPerUnit,       // cost per tracking unit
+      unit:         form.trackingUnit,
+      cost:         costPerUnit,
     };
-    if (editId) setIngredients(p=>p.map(i=>i.id===editId?{...i,...entry}:i));
-    else        setIngredients(p=>[...p, {...entry, id:`i${Date.now()}`}]);
+    await onSave(entry, editId);
     setModal(false);
   };
-  const del  = (id) => setIngredients(p=>p.filter(i=>i.id!==id));
+  const del  = (id) => onDelete(id);
   // If stock is 0, treat input as absolute "set to this amount"; otherwise treat as +/- delta
-  const adj  = (i) => {
-    const val = +adjQty;
-    setIngredients(p=>p.map(x=> x.id!==i.id ? x : {
-      ...x,
-      stock: Math.max(0, (i.stock === 0 || i.stock === "0") ? val : x.stock + val)
-    }));
+  const adj  = async (i) => {
+    await onAdjust(i.id, +adjQty);
     setAdjustId(null);
     setAdjQty("");
   };

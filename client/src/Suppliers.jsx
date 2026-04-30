@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { status, fc, fmtn, STATUS_COLOR, Badge, Card, SectionTitle, Th, Td, Btn, Input, Select, Label, FG, Modal } from "./ui.jsx";
 
-function Suppliers({ suppliers, setSuppliers, ingredients }) {
+function Suppliers({ suppliers, ingredients, onSave, onDelete }) {
   const blank = { name:"", contact:"", phone:"", notes:"" };
   const [modal, setModal] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -9,12 +9,11 @@ function Suppliers({ suppliers, setSuppliers, ingredients }) {
 
   const openAdd  = () => { setForm(blank); setEditId(null); setModal(true); };
   const openEdit = (s) => { setForm(s); setEditId(s.id); setModal(true); };
-  const save = () => {
-    if (editId) setSuppliers(p=>p.map(s=>s.id===editId?{...s,...form}:s));
-    else        setSuppliers(p=>[...p, {...form, id:`sup-${Date.now()}`}]);
+  const save = async () => {
+    await onSave(form, editId);
     setModal(false);
   };
-  const del = (id) => setSuppliers(p=>p.filter(s=>s.id!==id));
+  const del = (id) => onDelete(id);
 
   return (
     <div className="fade-up">

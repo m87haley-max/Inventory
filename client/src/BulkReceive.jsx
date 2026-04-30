@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { status, fc, fmtn, STATUS_COLOR, Badge, Bar, Card, SectionTitle, Th, Td, Btn, Input, Select, Label, FG } from "./ui.jsx";
 
-function BulkReceive({ ingredients, setIngredients, suppliers }) {
+function BulkReceive({ ingredients, suppliers, onReceive }) {
   const today = new Date().toISOString().slice(0,10);
   const [suppFilter, setSuppFilter] = useState("all");
   const [date, setDate]             = useState(today);
@@ -18,12 +18,8 @@ function BulkReceive({ ingredients, setIngredients, suppliers }) {
   const linesWithQty = filtered.filter(i => parseFloat(qtys[i.id]) > 0);
   const totalCost    = linesWithQty.reduce((a,i) => a + (parseFloat(qtys[i.id])||0) * i.cost, 0);
 
-  const receive = () => {
-    setIngredients(prev => prev.map(i => {
-      const received = parseFloat(qtys[i.id]) || 0;
-      if (received <= 0) return i;
-      return { ...i, stock: Math.round((i.stock + received) * 1000) / 1000 };
-    }));
+  const receive = async () => {
+    await onReceive(linesWithQty.map(i => ({ id: i.id, delta: parseFloat(qtys[i.id]) })));
     setQtys({});
     setNote("");
     setConfirmed(false);

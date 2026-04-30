@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { fc, fmtn, Card, SectionTitle, Th, Td, Btn, Input, Select, Label, FG } from "./ui.jsx";
 
-function Shrink({ shrinkLog, setShrinkLog, ingredients }) {
+function Shrink({ shrinkLog, ingredients, onAdd }) {
   const REASONS = ["Spoilage","Spillage","Temp abuse","Expired","Trim/yield loss","Theft","Other"];
   const blank = { date:new Date().toISOString().slice(0,10), ingredientId:ingredients[0]?.id||"", qty:"", reason:"Spoilage" };
   const [form, setForm] = useState(blank);
 
-  const add = () => {
-    const ing = ingredients.find(i=>i.id===form.ingredientId);
-    const costAmt = ing ? ing.cost * (+form.qty) : 0;
-    setShrinkLog(p=>[{ ...form, qty:+form.qty, cost:costAmt, id:`sh${Date.now()}` }, ...p]);
+  const add = async () => {
+    await onAdd({ date: form.date, ingredientId: form.ingredientId, qty: +form.qty, reason: form.reason });
     setForm(f=>({...f, qty:""}));
   };
 

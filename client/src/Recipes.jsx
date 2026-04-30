@@ -12,7 +12,7 @@ function getConversion(recipeUnit, stockUnit) {
 // Common recipe units for the dropdown
 const RECIPE_UNITS = ["oz","lbs","g","kg","tsp","tbsp","cup","ml","L","each","dozen","slice","portion","pinch"];
 
-function Recipes({ menuItems, setMenuItems, ingredients, setIngredients }) {
+function Recipes({ menuItems, ingredients, onSave, onDelete, onAddIngredient }) {
   const blank = { name:"", squareId:"", price:"", recipe:[] };
   const blankIng = { name:"", unit:"", category:"Shellfish", cost:"", par:"", shrinkPct:"5" };
   const [modal, setModal]             = useState(false);
@@ -26,11 +26,9 @@ function Recipes({ menuItems, setMenuItems, ingredients, setIngredients }) {
   const [newIng, setNewIng]           = useState(blankIng);
 
   // Create a brand-new ingredient and immediately add it as a recipe line
-  const createAndAddIngredient = () => {
+  const createAndAddIngredient = async () => {
     if (!newIng.name || !newIng.unit) return;
-    const id = `i${Date.now()}`;
-    const created = {
-      id,
+    const created = await onAddIngredient({
       name:       newIng.name,
       unit:       newIng.unit,
       category:   newIng.category,
@@ -39,11 +37,10 @@ function Recipes({ menuItems, setMenuItems, ingredients, setIngredients }) {
       stock:      0,
       shrinkPct:  +newIng.shrinkPct || 5,
       supplierId: "",
-    };
-    setIngredients(prev => [...prev, created]);
+    });
     setForm(f => ({
       ...f,
-      recipe: [...f.recipe, { id, qty: "", recipeUnit: newIng.unit }]
+      recipe: [...f.recipe, { id: created.id, qty: "", recipeUnit: newIng.unit }]
     }));
     setNewIng(blankIng);
     setShowNewIng(false);
@@ -61,9 +58,9 @@ function Recipes({ menuItems, setMenuItems, ingredients, setIngredients }) {
   };
 
   // Inline two-step delete — no browser confirm() dialog needed
-  const deleteItem = (id) => {
+  const deleteItem = async (id) => {
     if (confirmDeleteId === id) {
-      setMenuItems(p => p.filter(m => m.id !== id));
+      await onDelete(id);
       setConfirmDeleteId(null);
     } else {
       setConfirmDeleteId(id);
@@ -137,7 +134,7 @@ Convert price from cents to dollars (divide by 100).`,
     }
     setSquareSyncing(false);
   };
-  const save = () => {
+  const save = async () => {
     const e = {
       ...form,
       price: +form.price,
@@ -148,12 +145,11 @@ Convert price from cents to dollars (divide by 100).`,
           ...r,
           qty:          +r.qty,
           recipeUnit:   r.recipeUnit || ing?.unit || "",
-          stockQty:     +(+r.qty * conv).toFixed(4), // actual amount deducted from stock
+          stockQty:     +(+r.qty * conv).toFixed(4),
         };
       })
     };
-    if (editId) setMenuItems(p=>p.map(m=>m.id===editId?{...m,...e}:m));
-    else        setMenuItems(p=>[...p, {...e, id:`m${Date.now()}`}]);
+    await onSave(e, editId);
     setModal(false);
   };
 
